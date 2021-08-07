@@ -8,6 +8,7 @@ import sklearn.metrics as sklm
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn import datasets
+from sklearn.ensemble import RandomForestRegressor
 
 import mlflow
 import mlflow.pyfunc
@@ -64,12 +65,19 @@ with mlflow.start_run(run_name='linear_regression'):
 
 # COMMAND ----------
 
-import mlflow
-logged_model = 'runs:/8dc10c33a8a34c30ae43575d9dddfdac/linear_regression'
+# mlflow.start_run creates a new MLflow run to track the performance of this model. 
+# Within the context, you call mlflow.log_param to keep track of the parameters used, and
+# mlflow.log_metric to record metrics like accuracy.
+mlflow.sklearn.autolog(log_input_examples=True)
+with mlflow.start_run(run_name='random_forest_regression'):
+  model = RandomForestRegressor(n_estimators=500,n_jobs=-1,random_state=123)
+  model.fit(X_train, y_train)
+  metrics = mlflow.sklearn.eval_and_log_metrics(model, X_test, y_test, prefix="val_")  
+  display(pd.DataFrame(metrics,index=[0]))
 
-# Load model as a PyFuncModel.
-loaded_model = mlflow.pyfunc.load_model(logged_model)
+# COMMAND ----------
 
-# Predict on a Pandas DataFrame.
-import pandas as pd
-pred=loaded_model.predict(pd.DataFrame(boston_df))
+# This code is the same as the last block of "Building a Baseline Model". No change is required for clients to get the new model!
+model_name='boston_housing'
+model = mlflow.pyfunc.load_model(f"models:/{model_name}/production")
+print(f'MAE: {sklm.mean_absolute_error(y_test, model.predict(X_test))}')
